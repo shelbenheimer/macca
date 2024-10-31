@@ -1,6 +1,8 @@
 # MACCA (MAC Spoofing Tool)
 MACCA is a simple command-line MAC address spoofing tool. This tool operates using the built-in `ip` command in order to configure the MAC address of a particular network interface. By default, executing this tool will generate a random new MAC address using the **manuf.json** file that contains thousands of different OUI (organizationally unique identifiers) to disguise the device as something that it isn't. The last six bytes are then randomly generated using a built-in function.
 # Application Usage
+## Issues:
+- There is currently an issue with the **manuf.json** file that affects the ability for this tool to reliably generate a random MAC address. This is due to the list containing a few "incorrectly" (in the context of this tool) OUI entries that do not work well with the built-in functions of this tool.
 ## Support:
 Currently, this tool is only supported on **Linux** as it uses a method that is only available on **Linux**. Support for **Windows** is planned and will be implemented in future.
 ## Requirements:
