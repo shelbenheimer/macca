@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-# All software written by Tomas. (https://github.com/shelbenheimer/ata-shell)
+# All software written by Tomas. (https://github.com/shelbenheimer)
 
 from scapy.all import conf
 from json import load
@@ -8,6 +8,14 @@ from platform import system
 from random import choice
 import re
 import os
+
+BANNER = "Software written by Tomas. Available on GitHub. (https://github.com/shelbenheimer)"
+VENDOR_PATH = "Resources/manuf.json"
+
+BYTE_RANGE = [
+	[ 0, 1, 2, 3, 5, 6, 7, 8, 9 ],
+	[ 'a', 'b', 'c', 'd', 'e', 'f' ]
+]
 
 class Spoof:
 	def __init__(self, vendor_path, byte_range):
@@ -72,17 +80,10 @@ class Spoof:
 			self.GenRandByte()
 		).upper()
 
-BANNER = "Software written by Tomas. Available on GitHub. (https://github.com/shelbenheimer/ata-shell)"
-VENDOR_PATH = "Resources/manuf.json"
-BYTE_RANGE = [
-	[ 0, 1, 2, 3, 5, 6, 7, 8, 9 ],
-	[ 'a', 'b', 'c', 'd', 'e', 'f' ]
-]
-
 try:
-	path = f"{os.path.dirname(os.path.abspath(__file__))}/{VENDOR_PATH}"
-
 	print(BANNER)
+	
+	path = f"{os.path.dirname(os.path.abspath(__file__))}/{VENDOR_PATH}"
 	spoof = Spoof(path, BYTE_RANGE)
 	spoof.ChangeMAC(spoof.GenRandMAC())
 except KeyboardInterrupt:
