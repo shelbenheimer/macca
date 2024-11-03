@@ -3,7 +3,6 @@ MACCA is a simple command-line MAC address spoofing tool. This tool operates usi
 # Application Usage
 ## Issues:
 - There is currently an issue with the **manuf.json** file that affects the ability for this tool to reliably generate a random MAC address. This is due to the list containing a few "incorrectly" (in the context of this tool) OUI entries that do not work well with the built-in functions of this tool.
-- This tool does not currently support the ability to enter a pre-determined MAC address via user input. This will be changed in future, however, the current version of this tool is merely a prototype for a much better version of itself.
 ## Support:
 Currently, this tool is only supported on **Linux** as it uses a method that is only available on **Linux**. Support for **Windows** is planned and will be implemented in future.
 ## Requirements:

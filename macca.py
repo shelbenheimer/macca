@@ -2,12 +2,81 @@
 # All software written by Tomas. (https://github.com/shelbenheimer)
 
 from scapy.all import conf
-from json import load
-from subprocess import run
-from platform import system
-from random import choice
+from sys import argv
+import random
+import subprocess
+import platform
+import json
 import re
 import os
+
+class Spoof:
+	def __init__(self, mac, interface):
+		self.mac = mac
+		self.interface = interface
+
+	def ValidateMAC(self):
+		valid = "FF:FF:FF:FF:FF:FF"
+		if not len(self.mac) == len(valid):
+			return False
+
+		pattern = r'^[0-9a-fA-F]$'
+		for character in range(0, len(list(valid))):
+			if valid[character] == ':':
+				continue
+			if not re.match(pattern, self.mac[character]):
+				return False
+		return True
+
+	def ChangeMAC(self):
+		if not self.ValidateMAC():
+			print(f"Invalid MAC address {self.mac}.")
+			return
+
+		match platform.system():
+			case 'Linux':
+				subprocess.run(["ip", "link", "set", f"{self.interface}", "down"])
+				subprocess.run(["ip", "link", "set", f"{self.interface}", "address", f"{self.mac}"])
+				subprocess.run(["ip", "link", "set", f"{self.interface}", "up"])
+
+				print(f"Attempting to change MAC ({self.mac}).")
+				return True
+			case 'Windows':
+				print("This application does not currently support Windows.")
+				return False
+
+def PopulateList(path):
+	with open(path, 'r', encoding='utf8') as file:
+		return json.load(file)
+	print("Failed to populate list.")
+	return None
+
+def GenRandByte(byte_range):
+	return random.choice(random.choice(byte_range))
+
+def GenRandOUI(vendors):
+	return random.choice(list(vendors.keys()))
+
+def GenRandMAC(vendors, byte_range):
+	return "{}:{}{}:{}{}:{}{}".format(
+		GenRandOUI(vendors),
+		GenRandByte(byte_range),
+		GenRandByte(byte_range),
+		GenRandByte(byte_range),
+		GenRandByte(byte_range),
+		GenRandByte(byte_range),
+		GenRandByte(byte_range)
+	).upper()
+
+def ParseArgs(args, params):
+	temp = params
+	for arg in range(0, len(args)):
+		match args[arg]:
+			case '-m':
+				temp["MAC"] = args[arg + 1]
+			case '-i':
+				temp["Interface"] = args[arg + 1]
+	return temp
 
 BANNER = "Software written by Tomas. Available on GitHub. (https://github.com/shelbenheimer)"
 VENDOR_PATH = "Resources/manuf.json"
@@ -17,74 +86,16 @@ BYTE_RANGE = [
 	[ 'a', 'b', 'c', 'd', 'e', 'f' ]
 ]
 
-class Spoof:
-	def __init__(self, vendor_path, byte_range):
-		self.vendor_path = vendor_path
-		self.byte_range = byte_range
-
-		self.mac = None
-		self.interface = conf.iface
-
-		self.platform = system()
-		self.vendors = self.PopulateVendors(self.vendor_path)
-
-	def ValidateMAC(self, address):
-		valid = "FF:FF:FF:FF:FF:FF"
-		if not len(address) == len(valid):
-			return False
-
-		pattern = r'^[0-9a-fA-F]$'
-		for character in range(0, len(list(valid))):
-			if valid[character] == ':': continue
-
-			if not re.match(pattern, address[character]):
-				return False
-		return True
-
-	def ChangeMAC(self, address):
-		if not self.ValidateMAC(address):
-			print(f"Invalid MAC address {address}.")
-			return
-
-		match self.platform:
-			case 'Linux':
-				run(["ip", "link", "set", f"{self.interface}", "down"], text=True)
-				run(["ip", "link", "set", f"{self.interface}", "address", f"{address}"], text=True)
-				run(["ip", "link", "set", f"{self.interface}", "up"], text=True)
-
-				print(f"Changed MAC ({address}).")
-
-	def PopulateVendors(self, path):
-		with open(path, 'r', encoding='utf8') as file:
-			return load(file)
-		print("Failed to populate vendor list.")
-		return {}
-
-	def GenRandByte(self):
-		random_byte = choice(self.byte_range)
-		return choice(random_byte)
-
-	def GenRandOUI(self):
-		if not self.vendors: return
-		return choice(list(self.vendors.keys()))
-
-	def GenRandMAC(self):
-		oui = self.GenRandOUI()
-		return "{}:{}{}:{}{}:{}{}".format(
-			oui,
-			self.GenRandByte(),
-			self.GenRandByte(),
-			self.GenRandByte(),
-			self.GenRandByte(),
-			self.GenRandByte(),
-			self.GenRandByte()
-		).upper()
-
 try:
 	print(BANNER)
-	
+
 	path = f"{os.path.dirname(os.path.abspath(__file__))}/{VENDOR_PATH}"
-	spoof = Spoof(path, BYTE_RANGE)
-	spoof.ChangeMAC(spoof.GenRandMAC())
+	vendors = PopulateList(path)
+
+	params = { "MAC": GenRandMAC(vendors, BYTE_RANGE), "Interface": conf.iface }
+	params = ParseArgs(argv, params)
+	
+	spoof = Spoof(params["MAC"], params["Interface"])
+	spoof.ChangeMAC()
 except KeyboardInterrupt:
 	print("Caught interruption. Exiting gracefully.")
