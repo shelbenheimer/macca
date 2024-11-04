@@ -1,21 +1,34 @@
 #!/usr/bin/python3
 # All software written by Tomas. (https://github.com/shelbenheimer)
 
-from scapy.all import conf
-from sys import argv
+import socket
+import struct
+import fcntl
 import random
-import subprocess
 import platform
 import json
 import re
 import os
+import sys
+
+SIOCSIFHWADDR = 0x8924
+ARPHRD_ETHER = 1
+
+BANNER = "Software written by Tomas. Available on GitHub. (https://github.com/shelbenheimer)"
+VENDOR_PATH = "Resources/manuf.json"
+DEFAULT_IFACE = "wlan0"
+
+BYTE_RANGE = [
+	[ 0, 1, 2, 3, 5, 6, 7, 8, 9 ],
+	[ 'a', 'b', 'c', 'd', 'e', 'f' ]
+]
 
 class Spoof:
 	def __init__(self, mac, interface):
-		self.mac = mac
-		self.interface = interface
+		self.mac = str(mac)
+		self.interface = str(interface)
 
-	def ValidateMAC(self):
+	def ValidateMAC(self) -> bool:
 		valid = "FF:FF:FF:FF:FF:FF"
 		if not len(self.mac) == len(valid):
 			return False
@@ -28,22 +41,33 @@ class Spoof:
 				return False
 		return True
 
-	def ChangeMAC(self):
+	def ChangeMAC(self) -> bool:
 		if not self.ValidateMAC():
 			print(f"Invalid MAC address {self.mac}.")
 			return
 
-		match platform.system():
-			case 'Linux':
-				subprocess.run(["ip", "link", "set", f"{self.interface}", "down"])
-				subprocess.run(["ip", "link", "set", f"{self.interface}", "address", f"{self.mac}"])
-				subprocess.run(["ip", "link", "set", f"{self.interface}", "up"])
+		if not platform.system() == "Linux":
+			return False
+		
+		sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+		mac_bytes = bytes.fromhex(self.mac.replace(":", ""))
 
-				print(f"Attempting to change MAC ({self.mac}).")
-				return True
-			case 'Windows':
-				print("This application does not currently support Windows.")
-				return False
+		ifreq = struct.pack(
+			'16sH6s8s',
+			self.interface.encode('utf-8'),
+			ARPHRD_ETHER,
+			mac_bytes,
+			b'\x00' * 8
+		)
+
+		try:
+			fcntl.ioctl(sock.fileno(), SIOCSIFHWADDR, ifreq)
+			return True
+		except Exception as error:
+			print(error)
+			return False
+		finally:
+			sock.close()
 
 def PopulateList(path):
 	with open(path, 'r', encoding='utf8') as file:
@@ -58,15 +82,11 @@ def GenRandOUI(vendors):
 	return random.choice(list(vendors.keys()))
 
 def GenRandMAC(vendors, byte_range):
-	return "{}:{}{}:{}{}:{}{}".format(
-		GenRandOUI(vendors),
-		GenRandByte(byte_range),
-		GenRandByte(byte_range),
-		GenRandByte(byte_range),
-		GenRandByte(byte_range),
-		GenRandByte(byte_range),
-		GenRandByte(byte_range)
-	).upper()
+	remaining = 3
+	temp = [ GenRandOUI(vendors) ]
+	for iteration in range(0, remaining):
+		temp.append(f"{GenRandByte(byte_range)}{GenRandByte(byte_range)}")
+	return ":".join(temp).upper()
 
 def ParseArgs(args, params):
 	temp = params
@@ -78,24 +98,20 @@ def ParseArgs(args, params):
 				temp["Interface"] = args[arg + 1]
 	return temp
 
-BANNER = "Software written by Tomas. Available on GitHub. (https://github.com/shelbenheimer)"
-VENDOR_PATH = "Resources/manuf.json"
-
-BYTE_RANGE = [
-	[ 0, 1, 2, 3, 5, 6, 7, 8, 9 ],
-	[ 'a', 'b', 'c', 'd', 'e', 'f' ]
-]
-
 try:
 	print(BANNER)
 
 	path = f"{os.path.dirname(os.path.abspath(__file__))}/{VENDOR_PATH}"
 	vendors = PopulateList(path)
 
-	params = { "MAC": GenRandMAC(vendors, BYTE_RANGE), "Interface": conf.iface }
-	params = ParseArgs(argv, params)
+	params = { "MAC": GenRandMAC(vendors, BYTE_RANGE), "Interface": DEFAULT_IFACE }
+	params = ParseArgs(sys.argv, params)
 	
 	spoof = Spoof(params["MAC"], params["Interface"])
-	spoof.ChangeMAC()
+
+	if not spoof.ChangeMAC():
+		sys.exit()
+
+	print(f"Successfully changed MAC to {spoof.mac}")
 except KeyboardInterrupt:
 	print("Caught interruption. Exiting gracefully.")
